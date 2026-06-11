@@ -49,6 +49,104 @@ def clean_campaign_data():
 
 
     """
+    import os
+    import zipfile
+    
+    import pandas as pd
+
+    # Create output directory if it doesn't exist
+    os.makedirs("files/output", exist_ok=True)
+
+    # Initialize list to store all data
+    all_data = []
+
+    # Read and process each zip file
+    for i in range(10):
+        zip_file = f"files/input/bank-marketing-campaing-{i}.csv.zip"
+        with zipfile.ZipFile(zip_file, "r") as zip_ref:
+            # Get the CSV file name inside the zip
+            csv_file = zip_ref.namelist()[0]
+            # Read the CSV directly from the zip
+            df = pd.read_csv(zip_ref.open(csv_file))
+            all_data.append(df)
+
+    # Combine all data
+    data = pd.concat(all_data, ignore_index=True)
+
+    # Mapping for month abbreviations to numbers
+    month_map = {
+        "jan": "01",
+        "feb": "02",
+        "mar": "03",
+        "apr": "04",
+        "may": "05",
+        "jun": "06",
+        "jul": "07",
+        "aug": "08",
+        "sep": "09",
+        "oct": "10",
+        "nov": "11",
+        "dec": "12",
+    }
+
+    # ============ PROCESS CLIENT DATA ============
+    client = data[
+        ["client_id", "age", "job", "marital", "education", "credit_default", "mortgage"]
+    ].copy()
+
+    # Transform job: change "." to "" and "-" to "_"
+    client["job"] = client["job"].str.replace(".", "", regex=False).str.replace(
+        "-", "_", regex=False
+    )
+
+    # Transform education: change "." to "_" and "unknown" to pd.NA
+    client["education"] = client["education"].str.replace(".", "_", regex=False)
+    client["education"] = client["education"].replace("unknown", pd.NA)
+
+    # Transform credit_default: "yes" to 1, others to 0
+    client["credit_default"] = (client["credit_default"] == "yes").astype(int)
+
+    # Transform mortgage: "yes" to 1, others to 0
+    client["mortgage"] = (client["mortgage"] == "yes").astype(int)
+
+    # ============ PROCESS CAMPAIGN DATA ============
+    campaign = data[
+        [
+            "client_id",
+            "number_contacts",
+            "contact_duration",
+            "previous_campaign_contacts",
+            "previous_outcome",
+            "campaign_outcome",
+            "day",
+            "month",
+        ]
+    ].copy()
+
+    # Transform previous_outcome: "success" to 1, others to 0
+    campaign["previous_outcome"] = (campaign["previous_outcome"] == "success").astype(int)
+
+    # Transform campaign_outcome: "yes" to 1, others to 0
+    campaign["campaign_outcome"] = (campaign["campaign_outcome"] == "yes").astype(int)
+
+    # Create date field: YYYY-MM-DD format with year 2022
+    # Convert month names to numbers
+    month_numbers = campaign["month"].str.lower().map(month_map)
+    day_numbers = campaign["day"].astype(str).str.zfill(2)
+    campaign["last_contact_date"] = "2022-" + month_numbers + "-" + day_numbers
+
+    # Drop day and month columns as they are no longer needed
+    campaign = campaign.drop(columns=["day", "month"])
+
+    # ============ PROCESS ECONOMICS DATA ============
+    economics = data[
+        ["client_id", "cons_price_idx", "euribor_three_months"]
+    ].copy()
+
+    # ============ SAVE TO CSV ============
+    client.to_csv("files/output/client.csv", index=False)
+    campaign.to_csv("files/output/campaign.csv", index=False)
+    economics.to_csv("files/output/economics.csv", index=False)
 
     return
 
